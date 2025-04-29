@@ -1,4 +1,4 @@
-name: "Build and push Super Mario Docker image with dynamic tag to Docker Hubbb"
+name: "Build and push Super Mario Docker image with dynamic tag to Docker Hubbbb"
 
 on:
   push:
