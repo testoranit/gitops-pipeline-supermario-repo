@@ -1,33 +1,36 @@
 name: "Run Container Scan on Super Mario Docker Image with Quality Gate"
- 
-#on:
-#  push:
-#    branches:
-#      - main
- 
-env:
-  VERSION: $(( $(cat version.txt) + 1 ))
-  
+
+on:
+  workflow_run:
+    workflows: ["Build and push Super Mario Docker image with dynamic tag to Docker Hubbbbb"]
+    types:
+      - completed
+
 jobs:
-  
   run_container_image_scan_on_supermario_docker_image:
     runs-on: ubuntu-latest	
- 
+
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v3
- 
+
+      - name: Read Docker image version
+        id: get_version
+        run: |
+          version=$(cat version.txt)
+          echo "VERSION=$version" >> $GITHUB_ENV
+
       - name: Login to Docker Hub
         run: echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
         
-      - name: Get Docker Image from Docker Hub
+      - name: Pull and Save Docker Image
         run: |
           docker pull docker.io/testoranit/supermariogitopsproject:${{ env.VERSION }}
           docker save -o supermariolatestdockerimage.tar docker.io/testoranit/supermariogitopsproject:${{ env.VERSION }}
      
       - name: Run Trivy vulnerability scanner in tarball mode
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@0.20.0
         with:
-          input: /github/workspace/supermariolatestdockerimage.tar
+          input: ./supermariolatestdockerimage.tar
           exit-code: '1'
           severity: 'CRITICAL,HIGH'
