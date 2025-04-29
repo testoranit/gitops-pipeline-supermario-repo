@@ -1,25 +1,38 @@
 name: "Build and push Super Mario Docker image with dynamic tag to Docker Hub"
- 
-#on:
-#  push:
-#    branches:
-#      - main
- 
-env:
-  VERSION: $(( $(cat version.txt) + 1 ))
-  
+
+on:
+  push:
+    branches:
+      - main
+
 jobs:
-  
   build_push_supermario_docker_image:
     runs-on: ubuntu-latest
- 
+
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v3
-   
+
+      - name: Read and increment version
+        id: get_version
+        run: |
+          version=$(cat version.txt)
+          new_version=$((version + 1))
+          echo "New version: $new_version"
+          echo $new_version > version.txt
+          echo "VERSION=$new_version" >> $GITHUB_ENV
+
+      - name: Commit and push updated version.txt
+        run: |
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git add version.txt
+          git commit -m "Bump version to $VERSION"
+          git push origin main
+
       - name: Login to Docker Hub
         run: echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
- 
+
       - name: Build and Push Docker Image
         run: |
           docker build -t docker.io/testoranit/supermariogitopsproject:${{ env.VERSION }} .
