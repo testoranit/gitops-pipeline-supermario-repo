@@ -10,8 +10,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Repository
+      - name: Checkout Repository with PAT
         uses: actions/checkout@v3
+        with:
+          token: ${{ secrets.GH_PAT }}   # ✅ Use PAT here while cloning
 
       - name: Read and increment version
         id: get_version
@@ -22,14 +24,10 @@ jobs:
           echo $new_version > version.txt
           echo "VERSION=$new_version" >> $GITHUB_ENV
 
-      - name: Configure Git with PAT
+      - name: Commit and push updated version.txt
         run: |
           git config user.name github-actions
           git config user.email github-actions@github.com
-          git remote set-url origin https://x-access-token:${{ secrets.GH_PAT }}@github.com/testoranit/gitops-pipeline-supermario-repo.git
-
-      - name: Commit and push updated version.txt
-        run: |
           git add version.txt
           git commit -m "Bump version to ${{ env.VERSION }}"
           git push origin main
