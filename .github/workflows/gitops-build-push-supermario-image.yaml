@@ -7,13 +7,14 @@ on:
 
 jobs:
   build_push_supermario_docker_image:
+    if: github.actor != 'github-actions[bot]'   # ✅ Skip if the actor is the github-actions bot
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout Repository with PAT
         uses: actions/checkout@v3
         with:
-          token: ${{ secrets.GH_PAT }}   # ✅ Use PAT here while cloning
+          token: ${{ secrets.GH_PAT }}
 
       - name: Read and increment version
         id: get_version
