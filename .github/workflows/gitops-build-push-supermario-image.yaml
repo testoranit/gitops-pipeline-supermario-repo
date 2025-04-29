@@ -4,10 +4,12 @@ on:
   push:
     branches:
       - main
+    paths-ignore:
+      - version.txt  # 👈 ignore pushes that only modify this file
 
 jobs:
   build_push_supermario_docker_image:
-    if: github.actor != 'github-actions[bot]'   # ✅ Skip if the actor is the github-actions bot
+    if: github.actor != 'github-actions[bot]'   # ✅ Skip if triggered by GitHub Actions itself
     runs-on: ubuntu-latest
 
     steps:
