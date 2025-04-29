@@ -26,7 +26,7 @@ jobs:
         run: |
           git config user.name github-actions
           git config user.email github-actions@github.com
-          git remote set-url origin https://x-access-token:${{ secrets.GH_PAT }}@github.com/<your-username>/<your-repo-name>.git
+          git remote set-url origin https://x-access-token:${{ secrets.GH_PAT }}@github.com/testoranit/gitops-pipeline-supermario-repo.git
 
       - name: Commit and push updated version.txt
         run: |
