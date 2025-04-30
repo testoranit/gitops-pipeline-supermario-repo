@@ -27,6 +27,9 @@ jobs:
     runs-on: ubuntu-latest
     needs: run_sast_sonar_scan
 
+    outputs:
+      version: ${{ steps.get_version.outputs.version }}
+
     steps:
       - name: Checkout Repository with PAT
         uses: actions/checkout@v3
@@ -40,7 +43,7 @@ jobs:
           new_version=$((version + 1))
           echo $new_version > version.txt
           echo "VERSION=$new_version" >> $GITHUB_ENV
-          echo "::set-output name=version::$new_version"
+          echo "version=$new_version" >> $GITHUB_OUTPUT
 
       - name: Commit and push updated version.txt
         run: |
@@ -48,19 +51,22 @@ jobs:
           git config user.email github-actions@github.com
           git add version.txt
           git commit -m "Bump version to ${{ env.VERSION }}"
-          git push https://x-access-token:${{ secrets.GH_PAT }}@github.com/${{ github.repository }} HEAD:main
+          git push origin main
 
       - name: Login to Docker Hub
         run: echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
 
       - name: Build and Push Docker Image
         run: |
-          docker build -t docker.io/testoranit/supermariogitopsproject:${{ env.VERSION }} .
-          docker push docker.io/testoranit/supermariogitopsproject:${{ env.VERSION }}
+          docker build -t docker.io/${{ secrets.DOCKERHUB_USERNAME }}/supermariogitopsproject:${{ env.VERSION }} .
+          docker push docker.io/${{ secrets.DOCKERHUB_USERNAME }}/supermariogitopsproject:${{ env.VERSION }}
 
   scan_container_image:
     runs-on: ubuntu-latest
     needs: build_push_supermario_image
+
+    env:
+      VERSION: ${{ needs.build_push_supermario_image.outputs.version }}
 
     steps:
       - name: Checkout Repository
@@ -71,8 +77,8 @@ jobs:
 
       - name: Pull and Save Docker Image
         run: |
-          docker pull docker.io/testoranit/supermariogitopsproject:${{ env.VERSION }}
-          docker save -o supermariolatestdockerimage.tar docker.io/testoranit/supermariogitopsproject:${{ env.VERSION }}
+          docker pull docker.io/${{ secrets.DOCKERHUB_USERNAME }}/supermariogitopsproject:${{ env.VERSION }}
+          docker save -o supermariolatestdockerimage.tar docker.io/${{ secrets.DOCKERHUB_USERNAME }}/supermariogitopsproject:${{ env.VERSION }}
 
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@0.20.0
@@ -85,8 +91,11 @@ jobs:
     runs-on: ubuntu-latest
     needs: scan_container_image
 
+    env:
+      VERSION: ${{ needs.build_push_supermario_image.outputs.version }}
+
     steps:
-      - name: Checkout Repository
+      - name: Checkout Repository with PAT
         uses: actions/checkout@v3
         with:
           token: ${{ secrets.GH_PAT }}
@@ -99,8 +108,8 @@ jobs:
       - name: Update Deployment YAML and version
         run: |
           git pull
-          sed -i "s|image: testoranit/supermariogitopsproject:.*$|image: testoranit/supermariogitopsproject:${{ env.VERSION }}|" deployment.yaml
+          sed -i "s|image: .*/supermariogitopsproject:.*$|image: ${{ secrets.DOCKERHUB_USERNAME }}/supermariogitopsproject:${{ env.VERSION }}|" deployment.yaml
           echo "${{ env.VERSION }}" > version.txt
           git add deployment.yaml version.txt
           git commit -m "Updated deployment with image tag ${{ env.VERSION }}"
-          git push https://x-access-token:${{ secrets.GH_PAT }}@github.com/${{ github.repository }} HEAD:main
+          git push
