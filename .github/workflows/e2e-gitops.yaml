@@ -26,6 +26,8 @@ jobs:
   build_push_supermario_image:
     runs-on: ubuntu-latest
     needs: run_sast_sonar_scan
+    outputs:
+      version: ${{ steps.get_version.outputs.version }}
 
     steps:
       - name: Checkout Repository with PAT
@@ -39,8 +41,7 @@ jobs:
           version=$(cat version.txt)
           new_version=$((version + 1))
           echo $new_version > version.txt
-          echo "VERSION=$new_version" >> $GITHUB_ENV
-          echo "::set-output name=version::$new_version"
+          echo "version=$new_version" >> $GITHUB_OUTPUT
 
       - name: Commit and push updated version.txt
         run: |
@@ -61,7 +62,8 @@ jobs:
   scan_container_image:
     runs-on: ubuntu-latest
     needs: build_push_supermario_image
-
+    env:
+      VERSION: ${{ needs.build_push_supermario_image.outputs.version }}
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v3
@@ -84,7 +86,8 @@ jobs:
   update_k8s_deployment:
     runs-on: ubuntu-latest
     needs: scan_container_image
-
+    env:
+      VERSION: ${{ needs.build_push_supermario_image.outputs.version }}
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v3
