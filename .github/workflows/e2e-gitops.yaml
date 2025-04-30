@@ -26,8 +26,6 @@ jobs:
   build_push_supermario_image:
     runs-on: ubuntu-latest
     needs: run_sast_sonar_scan
-    outputs:
-      version: ${{ steps.get_version.outputs.version }}
 
     steps:
       - name: Checkout Repository with PAT
@@ -42,7 +40,7 @@ jobs:
           new_version=$((version + 1))
           echo $new_version > version.txt
           echo "VERSION=$new_version" >> $GITHUB_ENV
-          echo "version=$new_version" >> $GITHUB_OUTPUT
+          echo "::set-output name=version::$new_version"
 
       - name: Commit and push updated version.txt
         run: |
@@ -63,8 +61,6 @@ jobs:
   scan_container_image:
     runs-on: ubuntu-latest
     needs: build_push_supermario_image
-    env:
-      VERSION: ${{ needs.build_push_supermario_image.outputs.version }}
 
     steps:
       - name: Checkout Repository
@@ -75,8 +71,9 @@ jobs:
 
       - name: Pull and Save Docker Image
         run: |
-          docker pull docker.io/testoranit/supermariogitopsproject:${{ env.VERSION }}
-          docker save -o supermariolatestdockerimage.tar docker.io/testoranit/supermariogitopsproject:${{ env.VERSION }}
+          version=$(cat version.txt)
+          docker pull docker.io/testoranit/supermariogitopsproject:$version
+          docker save -o supermariolatestdockerimage.tar docker.io/testoranit/supermariogitopsproject:$version
 
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@0.20.0
@@ -88,8 +85,6 @@ jobs:
   update_k8s_deployment:
     runs-on: ubuntu-latest
     needs: scan_container_image
-    env:
-      VERSION: ${{ needs.build_push_supermario_image.outputs.version }}
 
     steps:
       - name: Checkout Repository
@@ -99,6 +94,12 @@ jobs:
         run: |
           git config --global user.email "${{ secrets.GIT_EMAIL }}"
           git config --global user.name "${{ secrets.GIT_USERNAME }}"
+
+      - name: Read version from file
+        id: read_version
+        run: |
+          VERSION=$(cat version.txt)
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
 
       - name: Update Deployment YAML and version
         run: |
