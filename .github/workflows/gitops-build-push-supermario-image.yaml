@@ -1,11 +1,11 @@
 name: "Build and push Super Mario Docker image with dynamic tag to Docker Hubbbb"
 
 #on:
-#  push:
-#    branches:
-#      - main
-#    paths-ignore:
-#      - version.txt  # 👈 ignore pushes that only modify this file
+ # push:
+  #  branches:
+   #   - main
+    paths-ignore:
+      - version.txt  # 👈 ignore pushes that only modify this file
 
 jobs:
   build_push_supermario_docker_image:
