@@ -41,6 +41,7 @@ jobs:
           version=$(cat version.txt)
           new_version=$((version + 1))
           echo $new_version > version.txt
+          echo "VERSION=$new_version" >> $GITHUB_ENV
           echo "version=$new_version" >> $GITHUB_OUTPUT
 
       - name: Commit and push updated version.txt
@@ -64,6 +65,7 @@ jobs:
     needs: build_push_supermario_image
     env:
       VERSION: ${{ needs.build_push_supermario_image.outputs.version }}
+
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v3
@@ -88,6 +90,7 @@ jobs:
     needs: scan_container_image
     env:
       VERSION: ${{ needs.build_push_supermario_image.outputs.version }}
+
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v3
