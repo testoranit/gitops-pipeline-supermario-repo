@@ -111,17 +111,13 @@ jobs:
           VERSION=${{ needs.build_push_supermario_image.outputs.version }}
           IMAGE_TAG="${DOCKER_IMAGE}:${VERSION}"
 
-          # Extract only the Deployment section, update image, and remerge with full file
           DEPLOY_FILE=deployment.yaml
 
-          # Split into two docs: Deployment and Service
           DEPLOYMENT=$(yq 'select(.kind == "Deployment")' $DEPLOY_FILE)
           SERVICE=$(yq 'select(.kind == "Service")' $DEPLOY_FILE)
 
-          # Update the image in Deployment
           UPDATED_DEPLOYMENT=$(echo "$DEPLOYMENT" | yq '.spec.template.spec.containers[] |= (select(.image | test("supermariogitopsproject")) | .image = strenv(IMAGE_TAG))')
 
-          # Combine both sections back
           echo "$UPDATED_DEPLOYMENT" > $DEPLOY_FILE
           echo "---" >> $DEPLOY_FILE
           echo "$SERVICE" >> $DEPLOY_FILE
@@ -134,3 +130,4 @@ jobs:
             git add deployment.yaml
             git commit -m "Update deployment.yaml with new image tag"
             git push origin main
+          fi
