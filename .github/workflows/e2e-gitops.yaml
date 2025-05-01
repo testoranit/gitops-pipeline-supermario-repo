@@ -6,7 +6,7 @@ on:
       - main
     paths-ignore:
       - version.txt
-      - deployment.yaml  # Prevent re-trigger due to deployment.yaml update
+      - deployment.yaml
 
 env:
   DOCKER_IMAGE: "docker.io/${{ secrets.DOCKERHUB_USERNAME }}/supermariogitopsproject"
@@ -100,21 +100,25 @@ jobs:
           git config --global user.name "${{ secrets.GIT_USERNAME }}"
           git config --global user.email "${{ secrets.GIT_EMAIL }}"
 
-      - name: Update deployment.yaml with New Image Version (Preserve YAML)
+      - name: Install yq (Go version by mikefarah)
+        run: |
+          sudo wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O /usr/local/bin/yq
+          sudo chmod +x /usr/local/bin/yq
+          yq --version
+
+      - name: Update deployment.yaml with New Image Version
         run: |
           git pull origin main
           VERSION=${{ needs.build_push_supermario_image.outputs.version }}
+          echo "Resolved image tag: $DOCKER_IMAGE:$VERSION"
 
-          # Install yq
-          pip install yq
+          export IMAGE_TAG="$DOCKER_IMAGE:$VERSION"
 
-          IMAGE_TAG="$DOCKER_IMAGE:$VERSION"
-          echo "Resolved image tag: $IMAGE_TAG"
-
-          # ✅ Use -y with -i to fix in-place editing
-          yq -y -i '.spec.template.spec.containers[] |= 
-            select(.image | test("supermariogitopsproject")) 
-            | .image = strenv(IMAGE_TAG)' deployment.yaml
+          yq -i '
+            .spec.template.spec.containers[] |= 
+              select(.image | test("supermariogitopsproject")) 
+              | .image = strenv(IMAGE_TAG)
+          ' deployment.yaml
 
           if git diff --quiet deployment.yaml; then
             echo "No changes to deployment.yaml. Skipping commit."
