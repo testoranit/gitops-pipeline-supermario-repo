@@ -7,6 +7,9 @@ on:
     paths-ignore:
       - version.txt
 
+env:
+  DOCKER_IMAGE: docker.io/${{ secrets.DOCKERHUB_USERNAME }}/supermariogitopsproject
+
 jobs:
   run_sast_sonar_scan:
     runs-on: ubuntu-latest
@@ -27,9 +30,6 @@ jobs:
     runs-on: ubuntu-latest
     needs: run_sast_sonar_scan
 
-    outputs:
-      version: ${{ steps.get_version.outputs.version }}
-
     steps:
       - name: Checkout Repository with PAT
         uses: actions/checkout@v3
@@ -39,11 +39,11 @@ jobs:
       - name: Read and increment version
         id: get_version
         run: |
-          version=$(cat version.txt)
+          version=$(cat version.txt 2>/dev/null || echo "0")
           new_version=$((version + 1))
-          echo $new_version > version.txt
+          echo "$new_version" > version.txt
           echo "VERSION=$new_version" >> $GITHUB_ENV
-          echo "version=$new_version" >> $GITHUB_OUTPUT
+          echo "::set-output name=version::$new_version"
 
       - name: Commit and push updated version.txt
         run: |
@@ -58,15 +58,16 @@ jobs:
 
       - name: Build and Push Docker Image
         run: |
-          docker build -t docker.io/${{ secrets.DOCKERHUB_USERNAME }}/supermariogitopsproject:${{ env.VERSION }} .
-          docker push docker.io/${{ secrets.DOCKERHUB_USERNAME }}/supermariogitopsproject:${{ env.VERSION }}
+          if [ -z "${{ env.VERSION }}" ]; then
+            echo "VERSION is empty. Exiting."
+            exit 1
+          fi
+          docker build -t $DOCKER_IMAGE:${{ env.VERSION }} .
+          docker push $DOCKER_IMAGE:${{ env.VERSION }}
 
   scan_container_image:
     runs-on: ubuntu-latest
     needs: build_push_supermario_image
-
-    env:
-      VERSION: ${{ needs.build_push_supermario_image.outputs.version }}
 
     steps:
       - name: Checkout Repository
@@ -77,8 +78,8 @@ jobs:
 
       - name: Pull and Save Docker Image
         run: |
-          docker pull docker.io/${{ secrets.DOCKERHUB_USERNAME }}/supermariogitopsproject:${{ env.VERSION }}
-          docker save -o supermariolatestdockerimage.tar docker.io/${{ secrets.DOCKERHUB_USERNAME }}/supermariogitopsproject:${{ env.VERSION }}
+          docker pull $DOCKER_IMAGE:${{ env.VERSION }}
+          docker save -o supermariolatestdockerimage.tar $DOCKER_IMAGE:${{ env.VERSION }}
 
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@0.20.0
@@ -91,14 +92,9 @@ jobs:
     runs-on: ubuntu-latest
     needs: scan_container_image
 
-    env:
-      VERSION: ${{ needs.build_push_supermario_image.outputs.version }}
-
     steps:
-      - name: Checkout Repository with PAT
+      - name: Checkout Repository
         uses: actions/checkout@v3
-        with:
-          token: ${{ secrets.GH_PAT }}
 
       - name: Configure Git
         run: |
@@ -108,8 +104,18 @@ jobs:
       - name: Update Deployment YAML and version
         run: |
           git pull
-          sed -i "s|image: .*/supermariogitopsproject:.*$|image: ${{ secrets.DOCKERHUB_USERNAME }}/supermariogitopsproject:${{ env.VERSION }}|" deployment.yaml
-          echo "${{ env.VERSION }}" > version.txt
+
+          # Ensure version.txt is not empty
+          if [ ! -s version.txt ]; then
+            echo "1" > version.txt
+          fi
+
+          VERSION=$(cat version.txt)
+
+          sed -i "s|image: .*/supermariogitopsproject:.*$|image: $DOCKER_IMAGE:$VERSION|" deployment.yaml
+
+          echo "$VERSION" > version.txt
+
           git add deployment.yaml version.txt
-          git commit -m "Updated deployment with image tag ${{ env.VERSION }}"
+          git commit -m "Updated deployment with image tag $VERSION"
           git push

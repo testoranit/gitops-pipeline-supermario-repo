@@ -13,12 +13,13 @@ spec:
         app: supermariogame
     spec:
       containers:
-      - image: testoranit/supermariogitopsproject:
-        name: supermariogame-container
+      - name: supermariogame-container
+        image: testoranit/supermariogitopsproject:1  # <-- Add tag here
         ports:
         - containerPort: 8080
- 
+
 ---
+
 apiVersion: v1
 kind: Service
 metadata:
@@ -28,7 +29,6 @@ spec:
     app: supermariogame
   ports:
   - protocol: TCP
-    port: 8600  # <-- Change this line to your desired port
+    port: 8600
     targetPort: 8080
   type: LoadBalancer
- 
