@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
       - name: supermariogame-container
-        image: docker.io/testoranit/supermariogitopsproject:latest  # <-- add a default tag
+        image: docker.io/testoranit/supermariogitopsproject:0  # <-- add a default tag
         ports:
         - containerPort: 8080
 ---
