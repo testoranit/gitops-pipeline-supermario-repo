@@ -8,7 +8,7 @@ on:
       - version.txt
 
 env:
-  DOCKER_IMAGE: docker.io/${{ secrets.DOCKERHUB_USERNAME }}/supermariogitopsproject
+  DOCKER_IMAGE: "docker.io/${{ secrets.DOCKERHUB_USERNAME }}/supermariogitopsproject"
 
 jobs:
   run_sast_sonar_scan:
