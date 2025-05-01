@@ -112,15 +112,12 @@ jobs:
           IMAGE_TAG="${DOCKER_IMAGE}:${VERSION}"
           DEPLOY_FILE=deployment.yaml
 
-          # Correctly update only the image field in the deployment.yaml (without modifying other sections)
+          # Correct syntax to only update the image field
           yq eval '
-            .spec.template.spec.containers |= 
+            .spec.template.spec.containers |=
               map(
-                if .name == "supermariogame-container" then 
-                  .image = strenv(IMAGE_TAG) 
-                else 
-                  . 
-                end
+                select(.name == "supermariogame-container") |
+                .image = strenv(IMAGE_TAG)
               )
           ' -i $DEPLOY_FILE
 
