@@ -106,24 +106,31 @@ jobs:
           sudo chmod +x /usr/local/bin/yq
           yq --version
 
-      - name: Update deployment.yaml with New Image Version
+      - name: Update Deployment Image in deployment.yaml
         run: |
-          git pull origin main
           VERSION=${{ needs.build_push_supermario_image.outputs.version }}
-          echo "Resolved image tag: $DOCKER_IMAGE:$VERSION"
+          IMAGE_TAG="${DOCKER_IMAGE}:${VERSION}"
 
-          export IMAGE_TAG="$DOCKER_IMAGE:$VERSION"
+          # Extract only the Deployment section, update image, and remerge with full file
+          DEPLOY_FILE=deployment.yaml
 
-          yq -i '
-            .spec.template.spec.containers[] |= 
-              select(.image | test("supermariogitopsproject")) 
-              | .image = strenv(IMAGE_TAG)
-          ' deployment.yaml
+          # Split into two docs: Deployment and Service
+          DEPLOYMENT=$(yq 'select(.kind == "Deployment")' $DEPLOY_FILE)
+          SERVICE=$(yq 'select(.kind == "Service")' $DEPLOY_FILE)
 
+          # Update the image in Deployment
+          UPDATED_DEPLOYMENT=$(echo "$DEPLOYMENT" | yq '.spec.template.spec.containers[] |= (select(.image | test("supermariogitopsproject")) | .image = strenv(IMAGE_TAG))')
+
+          # Combine both sections back
+          echo "$UPDATED_DEPLOYMENT" > $DEPLOY_FILE
+          echo "---" >> $DEPLOY_FILE
+          echo "$SERVICE" >> $DEPLOY_FILE
+
+      - name: Commit and Push Updated Deployment
+        run: |
           if git diff --quiet deployment.yaml; then
-            echo "No changes to deployment.yaml. Skipping commit."
+            echo "No changes detected in deployment.yaml."
           else
             git add deployment.yaml
-            git commit -m "Updated deployment.yaml to image tag $VERSION"
+            git commit -m "Update deployment.yaml with new image tag"
             git push origin main
-          fi
