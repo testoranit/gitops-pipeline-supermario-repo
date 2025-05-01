@@ -6,6 +6,7 @@ on:
       - main
     paths-ignore:
       - version.txt
+      - deployment.yaml  # Prevent re-trigger due to deployment.yaml update
 
 env:
   DOCKER_IMAGE: "docker.io/${{ secrets.DOCKERHUB_USERNAME }}/supermariogitopsproject"
@@ -51,7 +52,7 @@ jobs:
           git config user.email github-actions@github.com
           git add version.txt
           git commit -m "Bump version to $(cat version.txt)"
-          git push
+          git push origin main
 
       - name: Login to Docker Hub
         run: echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
@@ -75,10 +76,6 @@ jobs:
       - name: Pull and Save Docker Image
         run: |
           VERSION=${{ needs.build_push_supermario_image.outputs.version }}
-          if [ -z "$VERSION" ]; then
-            echo "VERSION is empty. Exiting."
-            exit 1
-          fi
           docker pull $DOCKER_IMAGE:$VERSION
           docker save -o supermariolatestdockerimage.tar $DOCKER_IMAGE:$VERSION
 
@@ -103,11 +100,16 @@ jobs:
           git config --global user.name "${{ secrets.GIT_USERNAME }}"
           git config --global user.email "${{ secrets.GIT_EMAIL }}"
 
-      - name: Update Kubernetes Deployment
+      - name: Update deployment.yaml with New Image Version
         run: |
-          git pull
+          git pull origin main
           VERSION=${{ needs.build_push_supermario_image.outputs.version }}
           sed -i "s|image: .*/supermariogitopsproject:.*$|image: $DOCKER_IMAGE:$VERSION|" deployment.yaml
-          git add deployment.yaml
-          git commit -m "Updated deployment with image tag $VERSION"
-          git push
+
+          if git diff --quiet deployment.yaml; then
+            echo "No changes to deployment.yaml. Skipping commit."
+          else
+            git add deployment.yaml
+            git commit -m "Updated deployment.yaml to image tag $VERSION"
+            git push origin main
+          fi
