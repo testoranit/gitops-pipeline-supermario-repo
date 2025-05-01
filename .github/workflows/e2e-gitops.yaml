@@ -43,7 +43,7 @@ jobs:
           new_version=$((version + 1))
           echo "$new_version" > version.txt
           echo "VERSION=$new_version" >> $GITHUB_ENV
-          
+
       - name: Commit and push updated version.txt
         run: |
           git config user.name github-actions
@@ -71,6 +71,10 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v3
+
+      - name: Debug VERSION variable
+        run: |
+          echo "VERSION from GITHUB_ENV: ${{ env.VERSION }}"
 
       - name: Debug Docker Image
         run: |
