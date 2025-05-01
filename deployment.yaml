@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
       - name: supermariogame-container
-        image: docker.io/testoranit/supermariogitopsproject:1  # Set to a valid initial version
+        image: docker.io/testoranit/supermariogitopsproject:4  # Set to a valid initial version
         ports:
         - containerPort: 8080
 

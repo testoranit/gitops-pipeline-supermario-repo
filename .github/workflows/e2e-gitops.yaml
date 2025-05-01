@@ -13,7 +13,6 @@ env:
 jobs:
   run_sast_sonar_scan:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v3
@@ -29,6 +28,8 @@ jobs:
   build_push_supermario_image:
     runs-on: ubuntu-latest
     needs: run_sast_sonar_scan
+    outputs:
+      version: ${{ steps.get_version.outputs.version }}
 
     steps:
       - name: Checkout Repository with PAT
@@ -42,14 +43,14 @@ jobs:
           version=$(cat version.txt 2>/dev/null || echo "0")
           new_version=$((version + 1))
           echo "$new_version" > version.txt
-          echo "VERSION=$new_version" >> $GITHUB_ENV
+          echo "version=$new_version" >> $GITHUB_OUTPUT
 
       - name: Commit and push updated version.txt
         run: |
           git config user.name github-actions
           git config user.email github-actions@github.com
           git add version.txt
-          git commit -m "Bump version to ${{ env.VERSION }}"
+          git commit -m "Bump version to $(cat version.txt)"
           git push origin main
 
       - name: Login to Docker Hub
@@ -57,40 +58,32 @@ jobs:
 
       - name: Build and Push Docker Image
         run: |
-          if [ -z "${{ env.VERSION }}" ]; then
-            echo "VERSION is empty. Exiting."
-            exit 1
-          fi
-          docker build -t $DOCKER_IMAGE:${{ env.VERSION }} .
-          docker push $DOCKER_IMAGE:${{ env.VERSION }}
+          VERSION=${{ steps.get_version.outputs.version }}
+          docker build -t $DOCKER_IMAGE:$VERSION .
+          docker push $DOCKER_IMAGE:$VERSION
 
   scan_container_image:
     runs-on: ubuntu-latest
     needs: build_push_supermario_image
-
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v3
 
-      - name: Debug VERSION variable
-        run: |
-          echo "VERSION from GITHUB_ENV: ${{ env.VERSION }}"
-
-      - name: Debug Docker Image
-        run: |
-          echo "DOCKER_IMAGE: $DOCKER_IMAGE:${{ env.VERSION }}"
+      - name: Debug VERSION
+        run: echo "VERSION is ${{ needs.build_push_supermario_image.outputs.version }}"
 
       - name: Login to Docker Hub
         run: echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
 
       - name: Pull and Save Docker Image
         run: |
-          if [ -z "${{ env.VERSION }}" ]; then
+          VERSION=${{ needs.build_push_supermario_image.outputs.version }}
+          if [ -z "$VERSION" ]; then
             echo "VERSION is empty. Exiting."
             exit 1
           fi
-          docker pull $DOCKER_IMAGE:${{ env.VERSION }}
-          docker save -o supermariolatestdockerimage.tar $DOCKER_IMAGE:${{ env.VERSION }}
+          docker pull $DOCKER_IMAGE:$VERSION
+          docker save -o supermariolatestdockerimage.tar $DOCKER_IMAGE:$VERSION
 
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@0.20.0
@@ -101,8 +94,7 @@ jobs:
 
   update_k8s_deployment:
     runs-on: ubuntu-latest
-    needs: scan_container_image
-
+    needs: build_push_supermario_image
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v3
@@ -112,22 +104,11 @@ jobs:
           git config --global user.email "${{ secrets.GIT_EMAIL }}"
           git config --global user.name "${{ secrets.GIT_USERNAME }}"
 
-      - name: Update Deployment YAML and version
+      - name: Update Deployment YAML with new image tag
         run: |
           git pull
-
-          # Ensure version.txt is not empty
-          if [ ! -s version.txt ]; then
-            echo "1" > version.txt
-          fi
-
-          VERSION=$(cat version.txt)
-
-          # Update deployment.yaml with the new image tag
+          VERSION=${{ needs.build_push_supermario_image.outputs.version }}
           sed -i "s|image: .*/supermariogitopsproject:.*$|image: $DOCKER_IMAGE:$VERSION|" deployment.yaml
-
-          echo "$VERSION" > version.txt
-
-          git add deployment.yaml version.txt
+          git add deployment.yaml
           git commit -m "Updated deployment with image tag $VERSION"
           git push
