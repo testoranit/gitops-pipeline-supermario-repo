@@ -114,8 +114,14 @@ jobs:
 
           # Correctly update only the image field in the deployment.yaml (without modifying other sections)
           yq eval '
-            .spec.template.spec.containers[] |= 
-              if .name == "supermariogame-container" then .image = strenv(IMAGE_TAG) else . end
+            .spec.template.spec.containers |= 
+              map(
+                if .name == "supermariogame-container" then 
+                  .image = strenv(IMAGE_TAG) 
+                else 
+                  . 
+                end
+              )
           ' -i $DEPLOY_FILE
 
       - name: Commit and Push Updated Deployment
