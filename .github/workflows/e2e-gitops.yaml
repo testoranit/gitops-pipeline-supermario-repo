@@ -104,12 +104,15 @@ jobs:
         run: |
           git pull origin main
           VERSION=${{ needs.build_push_supermario_image.outputs.version }}
-          
-          # Use yq to safely update the tag in deployment.yaml
+
+          # Install yq
           pip install yq
-          
+
           IMAGE_TAG="$DOCKER_IMAGE:$VERSION"
-          yq -i '.spec.template.spec.containers[] |= 
+          echo "Resolved image tag: $IMAGE_TAG"
+
+          # ✅ Use -y with -i to fix in-place editing
+          yq -y -i '.spec.template.spec.containers[] |= 
             select(.image | test("supermariogitopsproject")) 
             | .image = strenv(IMAGE_TAG)' deployment.yaml
 
