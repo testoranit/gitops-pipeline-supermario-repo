@@ -124,10 +124,10 @@ jobs:
 
       - name: Commit and Push Updated Deployment
         run: |
+          git pull --rebase origin main
           if git diff --quiet deployment.yaml; then
             echo "No changes detected in deployment.yaml."
           else
             git add deployment.yaml
             git commit -m "Update deployment.yaml with new image tag"
             git push origin main
-          fi
