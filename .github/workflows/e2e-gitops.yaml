@@ -106,22 +106,28 @@ jobs:
           sudo chmod +x /usr/local/bin/yq
           yq --version
 
-      - name: Update Deployment Image in deployment.yaml
+      - name: Update Image in deployment.yaml
         run: |
           VERSION=${{ needs.build_push_supermario_image.outputs.version }}
           IMAGE_TAG="${DOCKER_IMAGE}:${VERSION}"
           DEPLOY_FILE=deployment.yaml
 
-          DEPLOYMENT=$(yq 'select(.kind == "Deployment")' $DEPLOY_FILE)
-          SERVICE=$(yq 'select(.kind == "Service")' $DEPLOY_FILE)
+          yq eval-all '
+            select(fileIndex == 0 and .kind == "Deployment") 
+            | .spec.template.spec.containers[] 
+            |= if .name == "supermariogame-container" 
+               then .image = strenv(IMAGE_TAG) 
+               else . end
+          ' $DEPLOY_FILE > temp-deploy.yaml
 
-          UPDATED_DEPLOYMENT=$(echo "$DEPLOYMENT" | yq '.spec.template.spec.containers[] |= (select(.image | test("supermariogitopsproject")) | .image = strenv(IMAGE_TAG))')
+          # Append the service back
+          yq eval-all '
+            select(fileIndex == 0 and .kind == "Service")
+          ' $DEPLOY_FILE >> temp-deploy.yaml
 
-          echo "$UPDATED_DEPLOYMENT" > $DEPLOY_FILE
-          echo "---" >> $DEPLOY_FILE
-          echo "$SERVICE" >> $DEPLOY_FILE
+          mv temp-deploy.yaml $DEPLOY_FILE
 
-      - name: Commit and Push Updated Deployment with Rebase
+      - name: Commit and Push Updated Deployment
         run: |
           git add deployment.yaml
           git commit -m "Update deployment.yaml with new image tag" || echo "No changes to commit"
