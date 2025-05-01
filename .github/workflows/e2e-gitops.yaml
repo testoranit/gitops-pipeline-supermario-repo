@@ -116,20 +116,25 @@ jobs:
           IMAGE_TAG="${DOCKER_IMAGE}:${VERSION}"
           DEPLOY_FILE=deployment.yaml
 
-          # Validate deployment file exists
           if [ ! -f "$DEPLOY_FILE" ]; then
             echo "$DEPLOY_FILE not found!"
             exit 1
           fi
 
-          # Update image in deployment.yaml
-          yq eval "
-            (.spec.template.spec.containers[] | select(.name == \"supermariogame-container\") ).image = \"$IMAGE_TAG\"
-          " -i $DEPLOY_FILE
+          # Ensure the container entry exists before updating
+          if ! yq e '.spec.template.spec.containers[].name' $DEPLOY_FILE | grep -q "supermariogame-container"; then
+            echo "supermariogame-container not found in deployment.yaml! Aborting."
+            exit 1
+          fi
+
+          # Safely update the container image
+          yq e '
+            (.spec.template.spec.containers[] | select(.name == "supermariogame-container")).image = strenv(IMAGE_TAG)
+          ' -i "$DEPLOY_FILE"
 
       - name: Commit and Push Updated Deployment
         run: |
           git add deployment.yaml
-          git commit -m "Update deployment.yaml with new image tag" || echo "No changes to commit"
+          git commit -m "Update deployment.yaml with new image tag $IMAGE_TAG" || echo "No changes to commit"
           git pull --rebase origin main
           git push origin main
