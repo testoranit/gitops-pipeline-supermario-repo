@@ -73,11 +73,18 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v3
 
+      - name: Debug Docker Image
+        run: echo "DOCKER_IMAGE: $DOCKER_IMAGE:${{ env.VERSION }}"
+
       - name: Login to Docker Hub
         run: echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
 
       - name: Pull and Save Docker Image
         run: |
+          if [ -z "${{ env.VERSION }}" ]; then
+            echo "VERSION is empty. Exiting."
+            exit 1
+          fi
           docker pull $DOCKER_IMAGE:${{ env.VERSION }}
           docker save -o supermariolatestdockerimage.tar $DOCKER_IMAGE:${{ env.VERSION }}
 
@@ -112,6 +119,7 @@ jobs:
 
           VERSION=$(cat version.txt)
 
+          # Update deployment.yaml with the new image tag
           sed -i "s|image: .*/supermariogitopsproject:.*$|image: $DOCKER_IMAGE:$VERSION|" deployment.yaml
 
           echo "$VERSION" > version.txt
