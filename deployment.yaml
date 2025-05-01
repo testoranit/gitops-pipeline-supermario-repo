@@ -13,11 +13,11 @@ spec:
         app: supermariogame
     spec:
       containers:
-      - name: supermariogame-container
-        image: docker.io/testoranit/supermariogitopsproject:latest
-        ports:
-        - containerPort: 8080
-
+        - name: supermariogame-container
+          image: docker.io/testoranit/supermariogitopsproject:latest
+          ports:
+            - containerPort: 8080
+image: ""
 ---
 apiVersion: v1
 kind: Service
@@ -27,7 +27,11 @@ spec:
   selector:
     app: supermariogame
   ports:
-  - protocol: TCP
-    port: 8600
-    targetPort: 8080
+    - protocol: TCP
+      port: 8600
+      targetPort: 8080
   type: LoadBalancer
+  template:
+    spec:
+      containers: []
+image: ""
