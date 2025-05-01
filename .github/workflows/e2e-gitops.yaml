@@ -100,11 +100,18 @@ jobs:
           git config --global user.name "${{ secrets.GIT_USERNAME }}"
           git config --global user.email "${{ secrets.GIT_EMAIL }}"
 
-      - name: Update deployment.yaml with New Image Version
+      - name: Update deployment.yaml with New Image Version (Preserve YAML)
         run: |
           git pull origin main
           VERSION=${{ needs.build_push_supermario_image.outputs.version }}
-          sed -i -E "s|(image:\s*docker.io/.*/supermariogitopsproject)(:[a-zA-Z0-9._-]*)?|\1:$VERSION|" deployment.yaml
+          
+          # Use yq to safely update the tag in deployment.yaml
+          pip install yq
+          
+          IMAGE_TAG="$DOCKER_IMAGE:$VERSION"
+          yq -i '.spec.template.spec.containers[] |= 
+            select(.image | test("supermariogitopsproject")) 
+            | .image = strenv(IMAGE_TAG)' deployment.yaml
 
           if git diff --quiet deployment.yaml; then
             echo "No changes to deployment.yaml. Skipping commit."
